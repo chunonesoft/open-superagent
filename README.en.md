@@ -1,3 +1,5 @@
+<img src="docs/assets/logo.png" alt="open-superagent" width="80" align="right">
+
 # open-superagent
 
 [简体中文](README.md) · English

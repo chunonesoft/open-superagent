@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="docs/assets/logo.png" alt="open-superagent" width="96">
+
 # open-superagent
 
 **能接自建 GitLab 和钉钉的主动式编程智能体：在群里 @ 它派活，它自己开工单、写代码、提 MR，再回到原对话里交付。**
