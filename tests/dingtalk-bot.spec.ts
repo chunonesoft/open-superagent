@@ -263,6 +263,45 @@ describe('message send', () => {
     expect(JSON.parse(unknown.err())).toMatchObject({ error: { code: 400 } })
   })
 
+  it('sends an ActionCard when given buttons, through a webhook or the OpenAPI', async () => {
+    const PR = 'https://github.com/acme/widgets/pull/12', MR = 'https://gitlab.example.test/acme/widgets/-/merge_requests/7'
+    const { fetch, calls } = respond({ [HOOK]: () => answer({ errcode: 0, errmsg: 'ok' }), [TOKEN]: () => answer({ accessToken: 'tok-1' }),
+      [`${API}/v1.0/robot/groupMessages/send`]: () => answer({ processQueryKey: 'key-1' }),
+      [`${API}/v1.0/robot/oToMessages/batchSend`]: () => answer({ processQueryKey: 'key-2', invalidStaffIdList: [], flowControlStaffIdList: [] }) })
+    // One button: a webhook card cannot mention anyone, so the text names nobody it would not otherwise name.
+    const one = await configured({ fetch, stdin: `Fixed, see ${PR}` })
+    expect(await main([...send, '--webhook', HOOK, '--at', 'staff-1', '--button', `查看 PR #12=${PR}`], one.io)).toBe(0)
+    expect(calls.at(-1)!.body).toEqual({ msgtype: 'actionCard', actionCard: { title: 'dsh #a1b2c3d4', text: `Fixed, see ${PR}`,
+      singleTitle: '查看 PR #12', singleURL: PR } })
+    // Several buttons stack vertically; the title of a button ends at its first `=`, since a URL may hold more.
+    const two = await configured({ fetch, stdin: 'Both done.' })
+    expect(await main([...send, '--webhook', HOOK, '--button', `PR=${PR}`, '--button', `MR=${MR}?a=b`], two.io)).toBe(0)
+    expect(calls.at(-1)!.body).toEqual({ msgtype: 'actionCard', actionCard: { title: 'dsh #a1b2c3d4', text: 'Both done.', btnOrientation: '0',
+      btns: [{ title: 'PR', actionURL: PR }, { title: 'MR', actionURL: `${MR}?a=b` }] } })
+    // The OpenAPI names a card by its number of buttons: sampleActionCard for one, sampleActionCardN for N.
+    const group = await configured({ fetch, stdin: 'Done.' })
+    expect(await main([...send, '--button', `PR=${PR}`], group.io)).toBe(0)
+    expect(calls.at(-1)).toMatchObject({ url: `${API}/v1.0/robot/groupMessages/send`, body: { msgKey: 'sampleActionCard',
+      msgParam: JSON.stringify({ title: 'dsh #a1b2c3d4', text: 'Done.', singleTitle: 'PR', singleURL: PR }) } })
+    const direct = await configured({ fetch, stdin: 'Done.' })
+    expect(await main(['message', 'send', '--user', 'staff-1', '--title', 't', '--text-stdin', '--button', `PR=${PR}`, '--button', `MR=${MR}`, '--button', `Panel=${PR}#x`], direct.io)).toBe(0)
+    expect(calls.at(-1)).toMatchObject({ url: `${API}/v1.0/robot/oToMessages/batchSend`, body: { msgKey: 'sampleActionCard3',
+      msgParam: JSON.stringify({ title: 't', text: 'Done.', actionTitle1: 'PR', actionURL1: PR, actionTitle2: 'MR', actionURL2: MR, actionTitle3: 'Panel', actionURL3: `${PR}#x` }) } })
+  })
+
+  it('refuses a malformed button before sending anything', async () => {
+    const { fetch, calls } = respond({ [HOOK]: () => answer({ errcode: 0, errmsg: 'ok' }) })
+    for (const button of ['no-url', '=https://example.test', 'Open=ftp://example.test', 'Open=not a url']) {
+      const run = await configured({ fetch, stdin: 'x' })
+      expect(await main([...send, '--webhook', HOOK, '--button', button], run.io)).toBe(1)
+      expect(run.err()).toContain('--button')
+    }
+    const many = await configured({ fetch, stdin: 'x' })
+    expect(await main([...send, '--webhook', HOOK, ...Array.from({ length: 6 }, (_, index) => ['--button', `B${index}=https://example.test/${index}`]).flat()], many.io)).toBe(1)
+    expect(many.err()).toContain('5')
+    expect(calls).toEqual([])
+  })
+
   it('sends nowhere without a target', async () => {
     const { fetch } = respond({ [TOKEN]: () => answer({ accessToken: 'tok-1' }) })
     const run = await configured({ fetch, stdin: 'x' })

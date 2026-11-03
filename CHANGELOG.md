@@ -2,6 +2,12 @@
 
 本项目基于 [deepseek-ai/dsh-superagent-prototype](https://github.com/deepseek-ai/dsh-superagent-prototype) 的首个公开版本（0.1.0）。
 
+## 未发布
+
+### 新增
+
+- **钉钉卡片回复**：带链接的回复（如交付的 PR/MR）以 ActionCard 卡片发送，每个链接一个按钮（最多 3 个），PR/MR/Issue 按编号命名按钮；不带链接的回复仍是 Markdown。卡片无法 @ 人。`dingtalk-bot message send` 新增 `--button title=url`。
+
 ## 0.2.0 — 2026-11-03
 
 open-superagent 的首个版本。

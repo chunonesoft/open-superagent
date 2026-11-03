@@ -16,7 +16,7 @@ import { SettingsSchema, settingsPolicy } from '../src/policy.ts'
 import { SetupError } from '../src/setup.ts'
 import { apply as applyDingtalk, dingtalkKind } from '../src/sources/dingtalk.ts'
 import { WEBHOOK_VARIABLE as CLI_WEBHOOK_VARIABLE } from '../src/cli/dingtalk-bot.ts'
-import { WEBHOOK_VARIABLE, sendDingtalk } from '../src/sources/dingtalk-channel.ts'
+import { WEBHOOK_VARIABLE, replyButtons, sendDingtalk } from '../src/sources/dingtalk-channel.ts'
 import { prune, runDingtalk } from '../src/sources/dingtalk-loops.ts'
 import { BotMessageSchema, SOURCE, dingtalkTrigger, dingtalkTriggerId, markerIn, replyTitle, threadMarker, type Roots }
   from '../src/sources/dingtalk-trigger.ts'
@@ -216,6 +216,32 @@ describe('DingTalk Channel', () => {
     const stranger = bot()
     expect(await sendDingtalk(stranger.host, without(reply({ direct: 'true' }), 'webhook', 'expires', 'staffId'))).toBe('gone')
     expect(stranger.dingtalk).not.toHaveBeenCalled()
+  })
+
+  it('turns the links of a reply into card buttons, labelled in the language of the reply', () => {
+    const PR = 'https://github.com/acme/widgets/pull/12', MR = 'https://gitlab.example.test/acme/widgets/-/merge_requests/7'
+    expect(replyButtons('Done.')).toEqual([])
+    expect(replyButtons(`已修复，PR：${PR}`)).toEqual([{ title: '查看 PR #12', url: PR }])
+    expect(replyButtons(`Fixed in [the MR](${MR}). Issue: https://github.com/acme/widgets/issues/3.`)).toEqual([
+      { title: 'View MR !7', url: MR }, { title: 'View Issue #3', url: 'https://github.com/acme/widgets/issues/3' }])
+    // Another link keeps its Markdown label, or is a plain open link; a repeated link is one button, and a card holds at most three.
+    expect(replyButtons('见[设计文档](https://docs.example.test/a=b)和 https://example.test/x，https://example.test/x')).toEqual([
+      { title: '设计文档', url: 'https://docs.example.test/a=b' }, { title: '打开链接', url: 'https://example.test/x' }])
+    const four = [1, 2, 3, 4].map(n => `https://github.com/acme/widgets/pull/${n}`).join(' ')
+    expect(replyButtons(four).map(button => button.title)).toEqual(['View PR #1', 'View PR #2', 'View PR #3'])
+    // A label cannot end the CLI's `title=url` early, and stays short.
+    expect(replyButtons('[a=b](https://example.test/1) [' + 'x'.repeat(40) + '](https://example.test/2)').map(button => button.title))
+      .toEqual(['a-b', 'x'.repeat(19) + '…'])
+  })
+
+  it('sends a reply with links as a card, which mentions nobody', async () => {
+    const PR = 'https://github.com/acme/widgets/pull/12'
+    const { host, dingtalk } = bot({ ok: true }, { key: 'k' })
+    expect(await sendDingtalk(host, reply({}, `Fixed: ${PR}`))).toBe('sent')
+    expect(dingtalk.mock.calls[0]![0]).toEqual(['message', 'send', '--conversation', 'cid-test==', '--title', TITLE, '--text-stdin',
+      '--button', `View PR #12=${PR}`, '--webhook-env'])
+    await sendDingtalk(host, reply({ expires: '0' }, `Fixed: ${PR}`))
+    expect(dingtalk.mock.calls[1]![0]).toEqual(['message', 'send', '--conversation', 'cid-test==', '--title', TITLE, '--text-stdin', '--button', `View PR #12=${PR}`])
   })
 
   it('answers gone when the bot left the chat and throws otherwise', async () => {
