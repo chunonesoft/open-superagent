@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 400" width="960" height="400" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif">
+  <style>
+    .bg{fill:#ffffff}
+    .box{fill:#f6f8fa;stroke:#d0d7de;stroke-width:1.5}
+    .hl{fill:#eef4ff;stroke:#4d6bfe;stroke-width:1.5}
+    .new{fill:#fff7e6;stroke:#d48806;stroke-width:1.5}
+    .t{fill:#1f2328;font-size:15px;font-weight:600}
+    .s{fill:#57606a;font-size:12px}
+    .tag{fill:#d48806;font-size:11px;font-weight:600}
+    .ln{stroke:#8c959f;stroke-width:1.5;fill:none;marker-end:url(#a)}
+    .lnb{stroke:#4d6bfe;stroke-width:1.5;fill:none;stroke-dasharray:5 4;marker-end:url(#ab)}
+    @media (prefers-color-scheme:dark){
+      .bg{fill:#0d1117}
+      .box{fill:#161b22;stroke:#30363d}
+      .hl{fill:#141c33;stroke:#6f86ff}
+      .new{fill:#2a2010;stroke:#d48806}
+      .t{fill:#e6edf3}
+      .s{fill:#8b949e}
+      .ln{stroke:#6e7681}
+    }
+  </style>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="#8c959f"/></marker>
+    <marker id="ab" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="#4d6bfe"/></marker>
+  </defs>
+  <rect class="bg" width="960" height="400" rx="12"/>
+
+  <!-- Sources -->
+  <text class="s" x="40" y="36">来源 Source</text>
+  <rect class="box" x="30" y="50" width="170" height="56" rx="8"/>
+  <text class="t" x="48" y="76">GitHub</text><text class="s" x="48" y="95">Issue / PR / 评论 / CI</text>
+  <rect class="new" x="30" y="122" width="170" height="56" rx="8"/>
+  <text class="t" x="48" y="148">自建 GitLab</text><text class="tag" x="148" y="148">社区版</text><text class="s" x="48" y="167">Todo / MR / 评论 / 流水线</text>
+  <rect class="box" x="30" y="194" width="170" height="56" rx="8"/>
+  <text class="t" x="48" y="220">飞书</text><text class="s" x="48" y="239">群聊 / 私聊 / 话题</text>
+  <rect class="new" x="30" y="266" width="170" height="56" rx="8"/>
+  <text class="t" x="48" y="292">钉钉</text><text class="tag" x="88" y="292">社区版</text><text class="s" x="48" y="311">@机器人 / 私聊 / 部门同步</text>
+
+  <!-- Pipeline -->
+  <rect class="hl" x="260" y="150" width="140" height="70" rx="8"/>
+  <text class="t" x="278" y="178">Trigger</text><text class="s" x="278" y="200">有人 @ 了智能体</text>
+  <rect class="hl" x="440" y="150" width="140" height="70" rx="8"/>
+  <text class="t" x="458" y="178">Eval · 策略</text><text class="s" x="458" y="200">谁能派活、派什么活</text>
+  <rect class="hl" x="620" y="150" width="140" height="70" rx="8"/>
+  <text class="t" x="638" y="178">Ticket 工单</text><text class="s" x="638" y="200">独立会话 + 独立目录</text>
+  <rect class="box" x="800" y="150" width="130" height="70" rx="8"/>
+  <text class="t" x="818" y="178">交付</text><text class="s" x="818" y="200">PR / MR / 原地回复</text>
+
+  <path class="ln" d="M200 78 C230 78,230 175,258 175"/>
+  <path class="ln" d="M200 150 C228 150,232 180,258 180"/>
+  <path class="ln" d="M200 222 C228 222,232 190,258 190"/>
+  <path class="ln" d="M200 294 C230 294,230 195,258 195"/>
+  <path class="ln" d="M400 185 L438 185"/>
+  <path class="ln" d="M580 185 L618 185"/>
+  <path class="ln" d="M760 185 L798 185"/>
+
+  <!-- reply loop -->
+  <path class="lnb" d="M865 222 C865 370,115 370,115 324"/>
+  <text class="s" x="390" y="362">结果回到提出需求的那条对话里，只在需要人的时候才开口</text>
+
+  <!-- panel -->
+  <rect class="box" x="440" y="50" width="320" height="56" rx="8"/>
+  <text class="t" x="458" y="76">Web 面板</text><text class="s" x="458" y="95">只列出等人处理的事：审批、卡住的工单、系统问题</text>
+  <path class="ln" d="M600 106 L600 148"/>
+</svg>

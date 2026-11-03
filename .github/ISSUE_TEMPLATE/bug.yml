@@ -1,0 +1,35 @@
+name: 问题反馈 / Bug report
+description: 某个功能没有按文档工作
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: 请不要贴出密钥、令牌、内网地址或公司信息。安全问题请看 SECURITY.md 私下报告。
+  - type: dropdown
+    id: source
+    attributes:
+      label: 涉及的 Source
+      multiple: true
+      options: [GitHub, GitLab, 飞书 Feishu, 钉钉 DingTalk, 面板 Panel, 其他]
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: 发生了什么，期望是什么
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: 复现步骤
+  - type: input
+    id: version
+    attributes:
+      label: 版本
+      description: open-superagent 的提交或版本号，以及 `dsh --version`
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志或面板截图（请脱敏）
+      render: text

@@ -1,0 +1,100 @@
+name: Upstream sync
+
+# Checks deepseek-ai/dsh-superagent-prototype once a day. When upstream has
+# commits that main lacks, it merges them on the sync/upstream branch, runs
+# pnpm check, and opens (or updates) one pull request. A merge with conflicts
+# opens an issue instead, so a person resolves it locally.
+
+on:
+  schedule:
+    - cron: '17 1 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: upstream-sync
+  cancel-in-progress: false
+
+env:
+  UPSTREAM: https://github.com/deepseek-ai/dsh-superagent-prototype.git
+  BRANCH: sync/upstream
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Fetch upstream
+        id: fetch
+        run: |
+          git remote add upstream "$UPSTREAM"
+          git fetch --no-tags upstream main
+          head=$(git rev-parse upstream/main)
+          echo "head=$head" >> "$GITHUB_OUTPUT"
+          if git merge-base --is-ancestor upstream/main HEAD; then
+            echo "behind=false" >> "$GITHUB_OUTPUT"
+            echo "main already contains upstream $head"
+          else
+            echo "behind=true" >> "$GITHUB_OUTPUT"
+            git log --oneline HEAD..upstream/main | tee /tmp/commits.txt
+          fi
+
+      - name: Merge upstream
+        id: merge
+        if: steps.fetch.outputs.behind == 'true'
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git switch -C "$BRANCH"
+          if git merge --no-edit upstream/main -m "chore: merge upstream ${{ steps.fetch.outputs.head }}"; then
+            echo "conflict=false" >> "$GITHUB_OUTPUT"
+          else
+            git diff --name-only --diff-filter=U | tee /tmp/conflicts.txt
+            git merge --abort
+            echo "conflict=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Report conflicts
+        if: steps.merge.outputs.conflict == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="Upstream sync needs a manual merge"
+          body=$(printf 'Upstream `%s` does not merge cleanly into main.\n\nNew upstream commits:\n```\n%s\n```\nConflicting files:\n```\n%s\n```\nResolve locally:\n```sh\ngit fetch upstream && git switch main && git merge upstream/main\n```\n' \
+            "${{ steps.fetch.outputs.head }}" "$(cat /tmp/commits.txt)" "$(cat /tmp/conflicts.txt)")
+          existing=$(gh issue list --state open --search "in:title \"$title\"" --json number --jq '.[0].number')
+          if [ -n "$existing" ]; then gh issue comment "$existing" --body "$body"; else gh issue create --title "$title" --body "$body" --label upstream; fi
+
+      - uses: pnpm/action-setup@v4
+        if: steps.merge.outputs.conflict == 'false'
+      - uses: actions/setup-node@v4
+        if: steps.merge.outputs.conflict == 'false'
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Check the merge
+        id: check
+        if: steps.merge.outputs.conflict == 'false'
+        continue-on-error: true
+        run: pnpm install --frozen-lockfile && pnpm check
+
+      - name: Open or update the pull request
+        if: steps.merge.outputs.conflict == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git push --force origin "$BRANCH"
+          if [ "${{ steps.check.outcome }}" = success ]; then status='`pnpm check` passed on the merge.'; else status='**`pnpm check` failed on the merge**; see the workflow run before merging.'; fi
+          body=$(printf 'Merges upstream `%s` into main.\n\n%s\n\nNew upstream commits:\n```\n%s\n```\n\nRun: %s\n' \
+            "${{ steps.fetch.outputs.head }}" "$status" "$(cat /tmp/commits.txt)" "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID")
+          pr=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number')
+          if [ -n "$pr" ]; then gh pr edit "$pr" --body "$body"; else gh pr create --base main --head "$BRANCH" --title "chore: merge upstream updates" --body "$body" --label upstream; fi

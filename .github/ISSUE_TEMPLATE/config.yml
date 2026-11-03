@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 使用交流 / Discussions
+    url: https://github.com/chunonesoft/open-superagent/discussions
+    about: 配置问题、使用心得和想法，请到 Discussions。

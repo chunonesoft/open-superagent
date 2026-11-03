@@ -2,7 +2,13 @@
   "name": "dsh-superagent",
   "author": "DeepSeek Harness Team <team@dsh.dev>",
   "license": "MIT",
-  "version": "0.1.0",
+  "version": "0.2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chunonesoft/open-superagent.git"
+  },
+  "homepage": "https://github.com/chunonesoft/open-superagent#readme",
+  "bugs": "https://github.com/chunonesoft/open-superagent/issues",
   "private": true,
   "description": "A proactive agent for one repository, as a DSH (DeepSeek Harness) bundle: it listens to GitHub or a self-hosted GitLab and optionally to Feishu and DingTalk chats, evaluates requests under a Policy, turns authorized ones into Tickets, and executes each in its own DSH Session.",
   "type": "module",

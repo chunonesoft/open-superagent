@@ -1,0 +1,21 @@
+name: 功能建议 / Feature request
+description: 新的 Source、能力或文档
+labels: [enhancement]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: 你的团队遇到了什么问题
+      description: 先说场景，再说方案。
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: 你设想的做法
+  - type: checkboxes
+    id: help
+    attributes:
+      label: 参与
+      options:
+        - label: 我愿意提交 PR
