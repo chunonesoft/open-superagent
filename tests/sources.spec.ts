@@ -1064,7 +1064,8 @@ describe('feishu event consumer', () => {
   })
   /**
    * A bot CLI whose `event consume` behaves as `mode` says: `never` gets ready, `warn` warns once ready, `ready` stays up,
-   * and `flaky` exits after its first ready. It records each run and the PID of the latest.
+   * and `flaky` exits after its first ready. `events` waits after ready before printing its events: ready goes to stderr and
+   * events to stdout, two pipes the consumer may read in either order. It records each run and the PID of the latest.
    */
   function cli(mode: 'never' | 'warn' | 'ready' | 'flaky' | 'events' | 'late'): string {
     const path = join(dir, 'lark-bot')
@@ -1076,7 +1077,7 @@ describe('feishu event consumer', () => {
     warn) echo '[event] ready' >&2; echo 'WARN the connection was reset' >&2; exec sleep 60 ;;
     ready) echo '[event] ready' >&2; exec sleep 60 ;;
     flaky) echo '[event] ready' >&2; [ "$n" -gt 1 ] && exec sleep 60; exit 1 ;;
-    events) echo '[event] ready' >&2; cat '${dir}/events'; touch '${dir}/printed'; exec sleep 60 ;;
+    events) echo '[event] ready' >&2; sleep 0.3; cat '${dir}/events'; touch '${dir}/printed'; exec sleep 60 ;;
     late) echo '[event] ready' >&2; sleep 1; cat '${dir}/events'; touch '${dir}/printed'; exec sleep 60 ;;
   esac
   `, { mode: 0o755 })
