@@ -40,12 +40,45 @@ const unknownPerson = (error: unknown): boolean =>
  * is a separate entry that imports nothing of the package, and the bundle must not share a chunk with it. A test keeps the two equal.
  */
 export const WEBHOOK_VARIABLE = 'DINGTALK_BOT_WEBHOOK'
+/** The most buttons a reply's card shows: more links than this stay in its text only. */
+export const MAX_REPLY_BUTTONS = 3
+/** A Markdown link, or a bare address that ends before whitespace, a bracket, a quote or full-width punctuation. */
+const LINK = /\[([^\]]*)\]\((https?:\/\/[^)\s]+)\)|(https?:\/\/[^\s<>()[\]"'`，。、；：！？「」（）]+)/g
+const CJK = /[\u3400-\u9fff]/
+/** The label of a link to a pull request, merge request or Issue, in the reply's language, or nothing for any other page. */
+function knownLabel(url: string, zh: boolean): string | undefined {
+  const view = zh ? '查看' : 'View'
+  const { pathname } = new URL(url)
+  const mr = /\/-\/merge_requests\/(\d+)\/?$/.exec(pathname)
+  if (mr) return `${view} MR !${mr[1]}`
+  const pull = /\/pull\/(\d+)\/?$/.exec(pathname)
+  if (pull) return `${view} PR #${pull[1]}`
+  const issue = /\/(?:-\/)?issues\/(\d+)\/?$/.exec(pathname)
+  return issue ? `${view} Issue #${issue[1]}` : undefined
+}
+/**
+ * The buttons of the card a reply is sent as: one per distinct link, in the order of the text, at most MAX_REPLY_BUTTONS. A pull request,
+ * merge request or Issue is labelled by its number; another link keeps its Markdown label or opens as a plain link. A reply without a
+ * link has none, and stays a Markdown message: a card would only make an acknowledgement louder.
+ */
+export function replyButtons(text: string): { title: string; url: string }[] {
+  const zh = CJK.test(text)
+  const buttons: { title: string; url: string }[] = []
+  for (const match of text.matchAll(LINK)) {
+    const url = (match[2] ?? match[3]!).replace(/[.,;:!?]+$/, '')
+    if (!URL.canParse(url) || buttons.some(button => button.url === url)) continue
+    const label = (knownLabel(url, zh) ?? (match[1]?.trim() || (zh ? '打开链接' : 'Open link'))).replaceAll('=', '-')
+    buttons.push({ title: label.length > 20 ? `${label.slice(0, 19)}…` : label, url })
+    if (buttons.length === MAX_REPLY_BUTTONS) break
+  }
+  return buttons
+}
 /** Whether the address names a session webhook that has not yet expired. */
 const live = (address: Record<string, string>): boolean => !!address.webhook && Number(address.expires) > Date.now()
 
 /**
  * Replies in the conversation the target message came from, titled with the Thread's marker so that a quote of the reply finds the
- * Thread again. A live session webhook is tried first, as it can mention the sender; if it fails for any reason, or has expired, the robot
+ * Thread again; a reply with links goes as an ActionCard with a button per link (see `replyButtons`). A live session webhook is tried first, as it can mention the sender of a Markdown reply; if it fails for any reason, or has expired, the robot
  * API sends instead, and only its answer decides `gone`, but for a direct chat it cannot reach: one whose sender has no staff ID. Neither has an idempotency key: a send whose answer was lost may be sent twice.
  */
 export async function sendDingtalk(host: Pick<SourceContext, 'commands'>, message: OutboundMessage): Promise<'sent' | 'gone'> {
@@ -55,13 +88,14 @@ export async function sendDingtalk(host: Pick<SourceContext, 'commands'>, messag
   const text = checkedImText(message.text)
   const title = replyTitle(threadKey({ source: SOURCE, id: thread }))
   const direct = address.direct === 'true'
+  const buttons = replyButtons(text).flatMap(button => ['--button', `${button.title}=${button.url}`])
   const send = (target: [string, string], extra: string[] = [], env?: Record<string, string>) =>
-    host.commands.dingtalk(['message', 'send', ...target, '--title', title, '--text-stdin', ...extra], text, env)
+    host.commands.dingtalk(['message', 'send', ...target, '--title', title, '--text-stdin', ...buttons, ...extra], text, env)
   if (live(address)) {
     try {
-      // Nobody needs a mention in a direct chat, and a sender with no staff ID cannot be named.
+      // Nobody needs a mention in a direct chat, a sender with no staff ID cannot be named, and a card mentions nobody.
       // The webhook answers anyone who holds it, so it goes in the CLI's environment, which other local users cannot read, not in its arguments.
-      await send(['--conversation', conversationId], ['--webhook-env', ...!direct && staffId ? ['--at', staffId] : []], { [WEBHOOK_VARIABLE]: address.webhook! })
+      await send(['--conversation', conversationId], ['--webhook-env', ...!direct && staffId && !buttons.length ? ['--at', staffId] : []], { [WEBHOOK_VARIABLE]: address.webhook! })
       return 'sent'
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') throw error

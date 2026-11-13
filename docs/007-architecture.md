@@ -387,7 +387,7 @@ Some generic modules still refer directly to a Source:
 | `src/sources/feishu-image.ts` | Reads a Feishu message's image as an attachment for the assessing Session |
 | `src/sources/dingtalk.ts` | The DingTalk kind and plugin entry, exported as `./dingtalk-watch`: the chats and direct messages it receives, the Policy's list of staff IDs, synced from a department of the contacts, and no observed scope or history |
 | `src/sources/dingtalk-trigger.ts` | DingTalk robot messages as Triggers, whichever shape they come in; which Thread a quote joins, by the message it quotes or the marker in the title of the reply it quotes (`replyTitle`, `markerIn`); and DingTalk addresses |
-| `src/sources/dingtalk-channel.ts` | The DingTalk Channel: replies through the session webhook while it lives, else through the robot API, `sent` or `gone` by one predicate over the API's answer |
+| `src/sources/dingtalk-channel.ts` | The DingTalk Channel: replies through the session webhook while it lives, else through the robot API, as an ActionCard with a button per link when the reply holds links, `sent` or `gone` by one predicate over the API's answer |
 | `src/sources/dingtalk-loops.ts` | The DingTalk loops: the event consumer, restarted with backoff, and the keeping of what a quote needs for 14 days |
 | `skills/dsh-superagent-dingtalk/SKILL.md` | The DingTalk Source's skill: what the robot cannot read, how replies reach the conversation and carry their marker, and what `dingtalk-bot` does |
 | `src/client/index.tsx` | The client plugin entry: the sidebar entry, the main panel and the page in DeepSeek Harness's Plugin Manager |

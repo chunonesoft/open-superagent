@@ -33,6 +33,28 @@ export class BotError extends Error { constructor(message: string, readonly stat
 
 /** The robot API's message type that renders Markdown, which both a group and a direct send use. */
 const MSG_KEY = 'sampleMarkdown'
+/** The most buttons an ActionCard holds: the robot API's cards go up to `sampleActionCard5`. */
+export const MAX_BUTTONS = 5
+/** A button of an ActionCard, which opens its address; DingTalk calls nothing back when it is clicked. */
+export interface Button { title: string; url: string }
+/**
+ * Reads a `--button` value, `title=url`. The title ends at the first `=`, as an address may hold more; the address is http or https.
+ * @throws BotError naming `--button` for anything else, without echoing the value.
+ */
+export function parseButton(value: string): Button {
+  const at = value.indexOf('=')
+  const title = value.slice(0, Math.max(at, 0)).trim(), url = value.slice(at + 1).trim()
+  if (at < 1 || !title || !URL.canParse(url) || !['https:', 'http:'].includes(new URL(url).protocol))
+    throw new BotError('Pass each --button as title=url, with an http or https address')
+  return { title, url }
+}
+/** The fields of an ActionCard that the robot API takes in `msgParam`: one button is `sampleActionCard`, N are `sampleActionCardN`. */
+function cardParam(title: string, body: string, buttons: readonly Button[]): { msgKey: string; param: Record<string, string> } {
+  if (buttons.length === 1) return { msgKey: 'sampleActionCard', param: { title, text: body, singleTitle: buttons[0]!.title, singleURL: buttons[0]!.url } }
+  const param: Record<string, string> = { title, text: body }
+  buttons.forEach((button, index) => { param[`actionTitle${index + 1}`] = button.title; param[`actionURL${index + 1}`] = button.url })
+  return { msgKey: `sampleActionCard${buttons.length}`, param }
+}
 const json = (body: unknown, headers: Record<string, string> = {}): RequestInit =>
   ({ method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body), redirect: 'error' })
 /** What an error says without the request: its message and the system code beneath it, such as ECONNREFUSED. */
@@ -105,6 +127,8 @@ export interface SendInput {
   conversation?: string | undefined; user?: string | undefined
   /** A live `sessionWebhook`, which can mention people; without it the robot API sends. */
   webhook?: string | undefined; at?: readonly string[] | undefined
+  /** With buttons the message is an ActionCard, which mentions nobody, even through a webhook. */
+  buttons?: readonly Button[] | undefined
 }
 /**
  * Sends a Markdown message and returns `{ key }` (the robot API's message key) or `{ ok: true }` (through a webhook, which names none).
@@ -113,27 +137,34 @@ export interface SendInput {
 export async function sendMessage(config: BotConfig, input: SendInput, fetch: Fetch): Promise<{ key: string } | { ok: true }> {
   const { title, text: body } = input
   const { webhook } = input
+  const buttons = input.buttons ?? []
+  if (buttons.length > MAX_BUTTONS) throw new BotError(`A card holds at most ${MAX_BUTTONS} buttons`)
   if (webhook) {
     if (!URL.canParse(webhook) || new URL(webhook).protocol !== 'https:') throw new BotError('The webhook is not an https address')
     // Markdown mentions only show when the text names the person too.
     const named = (input.at ?? []).filter(id => !body.includes(`@${id}`)).map(id => `@${id}`)
     const shown = named.length ? `${named.join(' ')}\n\n${body}` : body
-    const answer = await call(fetch, webhook, json({ msgtype: 'markdown', markdown: { title, text: shown }, at: { atUserIds: input.at ?? [] } }), [webhook])
+    // An ActionCard ignores `at`, so its text names nobody: a name that notifies no one would only show a staff ID.
+    const message = !buttons.length ? { msgtype: 'markdown', markdown: { title, text: shown }, at: { atUserIds: input.at ?? [] } }
+      : { msgtype: 'actionCard', actionCard: buttons.length === 1 ? { title, text: body, singleTitle: buttons[0]!.title, singleURL: buttons[0]!.url }
+        : { title, text: body, btnOrientation: '0', btns: buttons.map(button => ({ title: button.title, actionURL: button.url })) } }
+    const answer = await call(fetch, webhook, json(message), [webhook])
     if (answer.errcode !== 0) throw new BotError(`DingTalk refused the webhook message: ${text(answer.errmsg) || 'no reason given'}`.slice(0, 300), Number(answer.errcode) || 0)
     return { ok: true }
   }
   if (!input.user && !input.conversation) throw new BotError('Name a conversation, a person or a webhook to send to')
   const headers = { 'x-acs-dingtalk-access-token': await accessToken(config, fetch) }
-  const msgParam = JSON.stringify({ title, text: body })
+  const card = buttons.length ? cardParam(title, body, buttons) : undefined
+  const msgKey = card?.msgKey ?? MSG_KEY, msgParam = JSON.stringify(card?.param ?? { title, text: body })
   const secrets = [config.clientSecret, headers['x-acs-dingtalk-access-token']]
   if (input.user) {
-    const answer = await call(fetch, `${API}/v1.0/robot/oToMessages/batchSend`, json({ robotCode: config.robotCode, userIds: [input.user], msgKey: MSG_KEY, msgParam }, headers), secrets)
+    const answer = await call(fetch, `${API}/v1.0/robot/oToMessages/batchSend`, json({ robotCode: config.robotCode, userIds: [input.user], msgKey, msgParam }, headers), secrets)
     const listed = (name: string): boolean => { const list = answer[name]; return Array.isArray(list) && list.includes(input.user) }
     if (listed('invalidStaffIdList')) throw new BotError('DingTalk does not know the person to send to', 400)
     if (listed('flowControlStaffIdList')) throw new BotError('DingTalk is limiting the messages to this person', 429)
     return { key: text(answer.processQueryKey) }
   }
-  const answer = await call(fetch, `${API}/v1.0/robot/groupMessages/send`, json({ robotCode: config.robotCode, openConversationId: input.conversation, msgKey: MSG_KEY, msgParam }, headers), secrets)
+  const answer = await call(fetch, `${API}/v1.0/robot/groupMessages/send`, json({ robotCode: config.robotCode, openConversationId: input.conversation, msgKey, msgParam }, headers), secrets)
   return { key: text(answer.processQueryKey) }
 }
 
@@ -271,7 +302,8 @@ function parse(argv: string[]) {
   try {
     return parseArgs({ args: argv, allowPositionals: true, options: { 'client-id': { type: 'string' }, 'client-secret-stdin': { type: 'boolean' },
       'robot-code': { type: 'string' }, conversation: { type: 'string' }, user: { type: 'string' }, title: { type: 'string' },
-      'text-stdin': { type: 'boolean' }, webhook: { type: 'string' }, 'webhook-env': { type: 'boolean' }, department: { type: 'string' }, at: { type: 'string', multiple: true } } })
+      'text-stdin': { type: 'boolean' }, webhook: { type: 'string' }, 'webhook-env': { type: 'boolean' }, department: { type: 'string' }, at: { type: 'string', multiple: true },
+      button: { type: 'string', multiple: true } } })
   } catch { throw new BotError('Unrecognized command line. Commands: config init, auth status, event consume, message send, contact members') }
 }
 async function dispatch(argv: string[], io: Io, secrets: string[]): Promise<unknown> {
@@ -306,13 +338,15 @@ async function dispatch(argv: string[], io: Io, secrets: string[]): Promise<unkn
     }
     case 'message send': {
       if (!values.title || !values['text-stdin']) throw new BotError('Pass --title and --text-stdin; the text is read from stdin')
+      const buttons = (values.button ?? []).map(parseButton)
+      if (buttons.length > MAX_BUTTONS) throw new BotError(`A card holds at most ${MAX_BUTTONS} buttons`)
       const config = await configured()
       // Read only when asked for, so a variable left in a shell never turns a send into a webhook send.
       const webhook = values['webhook-env'] ? io.env[WEBHOOK_VARIABLE] : values.webhook
       if (values['webhook-env'] && !webhook) throw new BotError(`--webhook-env reads the webhook from ${WEBHOOK_VARIABLE}, which is empty`)
       if (webhook) secrets.push(webhook)
       return sendMessage(config, { title: values.title, text: (await readAll(io.stdin)).replace(/\n$/, ''), conversation: values.conversation,
-        user: values.user, webhook, at: values.at }, io.fetch)
+        user: values.user, webhook, at: values.at, buttons }, io.fetch)
     }
     case 'contact members': {
       const department = values.department ?? ''

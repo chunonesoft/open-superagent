@@ -69,6 +69,22 @@ dsh-superagent 是 DeepSeek 团队开源的一套「主动式编程智能体」�
 
 **只接钉钉/飞书、不接代码平台**：用来做「帮我查一下昨天的报错是哪次提交引入的」这类调研，结论直接回到群里。
 
+## 真实案例：钉钉群里一句话，9 分钟交付一个 PR
+
+下面是 2026-11-03 的一次真实运行：在钉钉群里给一个静态官网派了个小活，下面的截图都没有修改过。
+
+1. 在群里 @ 机器人，说出要改什么。机器人马上回一句「收到」，复述它理解的需求。
+2. 它开了一个工单，在独立目录里改了 4 个页面，跑了站点自带的链接检查，用无头浏览器截了改动前后的对比图，然后推分支、提 PR。
+3. 做完后回到同一个群。回复里有 PR 链接，所以发的是一张带「查看 PR #1」按钮的 ActionCard 卡片。
+
+<p align="center"><img src="docs/assets/case/dingtalk-card.png" alt="钉钉群里：用户 @open-superagent 要求把 4 个页面页脚改成「© 2026 xsky」，机器人先回复收到，完成后回复一张带「查看 PR #1」按钮的卡片" width="620"></p>
+
+它提的 PR 写清了改了哪几行、为什么没动另外两个页面、怎么验证的，还附了前后截图：
+
+<p align="center"><img src="docs/assets/case/github-pr.png" alt="GitHub 上由智能体提交的 PR：标题「4 页页脚版权改为「© 2026 xsky」」，正文列出 4 处改动、未改动的地方和验证方式" width="860"></p>
+
+> 这个演示用的是个人仓库，智能体用的就是仓库主人的账号，所以验证通过后它直接合并了，截图里的 PR 已经是 Merged 状态。团队使用时请给智能体一个单独的机器人账号，并用分支保护规定由人来合并（见[安全须知](#安全须知)）。
+
 ## 快速开始
 
 需要：Node.js 22.19+ 或 24+、pnpm、git 2.32+、tmux、Python 3.8+、[DeepSeek Harness](https://www.deepseek.com/en/harness/)（版本见 `package.json` 的 `engines.dsh`），以及所选平台的 CLI（GitHub 用 `gh`，GitLab 用 `glab`，飞书用 `lark-cli`；钉钉的 `dingtalk-bot` 已内置）。
